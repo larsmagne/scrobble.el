@@ -36,7 +36,7 @@
 (require 'mm-url)
 
 (defvar scrobble-user ""
-  "last.fm user name."
+  "last.fm user name.")
 
 (defvar scrobble-password ""
   "Password to use.")
