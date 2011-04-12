@@ -81,7 +81,7 @@
 (defun scrobble-queue ()
   (dolist (elem (reverse scrobble-queue))
     (let* ((spec (car elem))
-	   (response (scrobble-2 spec)))
+	   (response (scrobble-try-send spec)))
       (when (zerop (length response))
 	(message "No scrobble response")
 	(return nil))
@@ -90,14 +90,14 @@
 	      (delete (assoc spec scrobble-queue)
 		      scrobble-queue))))))
   
-(defun scrobble-2 (spec)
-  (let ((response (scrobble-1 spec)))
+(defun scrobble-try-send (spec)
+  (let ((response (scrobble-send spec)))
     (when (string-match "BADAUTH" response)
       (scrobble-login)
-      (setq response (scrobble-1 spec)))
+      (setq response (scrobble-send spec)))
     response))
 
-(defun scrobble-1 (spec)
+(defun scrobble-send (spec)
   (let ((coding-system-for-write 'binary))
     (destructuring-bind (artist album song time track-length cddb-id) spec
       (with-temp-file "/tmp/scrobble"
@@ -106,11 +106,11 @@
 		 scrobble-user
 		 (md5 (concat (md5 scrobble-password)
 			      scrobble-challenge))
-		 (jukebox-scrobble-encode artist)
-		 (jukebox-scrobble-encode song)
-		 (jukebox-scrobble-encode album)
+		 (scrobble-encode artist)
+		 (scrobble-encode song)
+		 (scrobble-encode album)
 		 cddb-id track-length
-		 (jukebox-scrobble-encode
+		 (scrobble-encode
 		  (format-time-string
 		   "%Y-%m-%d %H:%M:%S"
 		   (time-subtract time
