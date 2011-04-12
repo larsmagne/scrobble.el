@@ -43,8 +43,8 @@
 
 ;; Internal variables.
 
-(defvar scrobble-challenge "")
-(defvar scrobble-url "")
+(defvar scrobble-challenge nil)
+(defvar scrobble-url nil)
 (defvar scrobble-last nil)
 (defvar scrobble-queue nil)
 
@@ -61,8 +61,7 @@
       (forward-line 1)
       (setq scrobble-challenge
 	    (buffer-substring (point) (point-at-eol)))
-      (message "Logged in to Last.fm with challenge %s"
-	       scrobble-challenge)
+      (message "Logged in to Last.fm")
       (forward-line 1)
       (setq scrobble-url
 	    (buffer-substring (point) (point-at-eol))))))
@@ -92,9 +91,8 @@
       (scrobble-queue))))
 
 (defun scrobble-queue ()
-  (dolist (elem (reverse scrobble-queue))
-    (let* ((spec (car elem))
-	   (response (scrobble-try-send spec)))
+  (dolist (spec (reverse scrobble-queue))
+    (let* ((response (scrobble-try-send spec)))
       (when (zerop (length response))
 	(message "No scrobble response")
 	(return nil))
@@ -104,6 +102,8 @@
 		      scrobble-queue))))))
   
 (defun scrobble-try-send (spec)
+  (unless scrobble-challenge
+    (scrobble-login))
   (let ((response (scrobble-send spec)))
     (when (string-match "BADAUTH" response)
       (scrobble-login)
