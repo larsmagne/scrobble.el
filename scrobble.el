@@ -22,8 +22,13 @@
 
 ;;; Commentary:
 
-;; Provide a convenient keypad based interface for displaying time,
-;; and waking myself up in the morning.
+;; This library provides an interface to the (old-style) last.fm
+;; scrobbling interface.  It tries to do this in a pretty reliable
+;; way, and retries the scrobbling if last.fm is down, which it pretty
+;; often is.
+
+;; Usage: Set `scrobble-user' and `scrobble-password', and then just call
+;; (scrobble artist album track).
 
 ;;; Code:
 
@@ -40,7 +45,7 @@
 
 (defvar scrobble-challenge "")
 (defvar scrobble-url "")
-(defvar scrobble-last-file nil)
+(defvar scrobble-last nil)
 (defvar scrobble-queue nil)
 
 (defun scrobble-login ()
@@ -70,10 +75,18 @@
     (insert-file-contents "/tmp/scrobble.string")
     (mm-url-form-encode-xwfu (buffer-string))))
 
+(defun scrobble-do-not-scrobble (artist album song)
+  "Say that we don't want to scrobble the song right now."
+  (setq scrobble-last (list artist album song)))
+
 (defun scrobble (artist album song &optional track-length cddb-id)
   (let ((spec (list artist album song)))
-    (when (and (not (assoc spec scrobble-queue))
-	       (not (equal spec scrobbled-last)))
+    ;; If we're being called repeatedly with the same song, then
+    ;; ignore subsequent calls.
+    (when (not (equal spec scrobble-last))
+      (setq scrobble-last spec)
+      ;; Calls to last.fm may fail, so just put everything on the
+      ;; queue, and flush the FIFO queue.
       (push (append spec (list (current-time) track-length cddb-id))
 	    scrobble-queue)
       (scrobble-queue))))
@@ -109,7 +122,8 @@
 		 (scrobble-encode artist)
 		 (scrobble-encode song)
 		 (scrobble-encode album)
-		 cddb-id track-length
+		 (or cddb-id "")
+		 (or track-length "")
 		 (scrobble-encode
 		  (format-time-string
 		   "%Y-%m-%d %H:%M:%S"
