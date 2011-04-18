@@ -67,12 +67,7 @@
 	    (buffer-substring (point) (point-at-eol))))))
 
 (defun scrobble-encode (string)
-  (let ((coding-system-for-write 'utf-8))
-    (with-temp-file "/tmp/scrobble.string"
-      (insert string)))
-  (with-temp-buffer
-    (insert-file-contents "/tmp/scrobble.string")
-    (mm-url-form-encode-xwfu (buffer-string))))
+  (mm-url-form-encode-xwfu (encode-coding-string string 'utf-8)))
 
 (defun scrobble-do-not-scrobble (artist album song)
   "Say that we don't want to scrobble the song right now."
