@@ -74,6 +74,8 @@
   (setq scrobble-last (list artist album song)))
 
 (defun scrobble (artist album song &optional track-length cddb-id)
+  (unless scrobble-challenge
+    (scrobble-login))
   (let ((spec (list artist album song)))
     ;; If we're being called repeatedly with the same song, then
     ;; ignore subsequent calls.
@@ -86,23 +88,7 @@
       (scrobble-queue))))
 
 (defun scrobble-queue ()
-  (dolist (spec (reverse scrobble-queue))
-    (let* ((response (scrobble-try-send spec)))
-      (when (zerop (length response))
-	(message "No scrobble response")
-	(return nil))
-      (when (string-match "OK" response)
-	(setq scrobble-queue
-	      (delete spec scrobble-queue))))))
-  
-(defun scrobble-try-send (spec)
-  (unless scrobble-challenge
-    (scrobble-login))
-  (let ((response (scrobble-send spec)))
-    (when (string-match "BADAUTH" response)
-      (scrobble-login)
-      (setq response (scrobble-send spec)))
-    response))
+  (scrobble-send (car scrobble-queue)))
 
 (defun scrobble-send (spec)
   (destructuring-bind (artist album song time track-length cddb-id) spec
@@ -125,9 +111,24 @@
 	  (url-request-extra-headers
 	   '(("Content-Type" . "application/x-www-form-urlencoded")))
 	  (url-request-method "POST"))
-      (with-current-buffer (url-retrieve-synchronously scrobble-url)
-	(message "%s" (buffer-string))
-	(replace-regexp-in-string "\n" " " (buffer-string))))))
+      (url-retrieve scrobble-url 'scrobble-check-and-run-queue (list spec)))))
+
+(defun scrobble-check-and-run-queue (status spec)
+  (goto-char (point-min))
+  (let ((buffer (current-buffer)))
+    (when (search-forward "\n\n" nil t)
+      (message "%s" (buffer-substring (point) (point-max)))
+      (cond
+       ((looking-at "BADAUTH")
+	(scrobble-login)
+	(when scrobble-queue
+	  (scrobble-queue)))
+       ((looking-at "OK")
+	(setq scrobble-queue
+	      (delete spec scrobble-queue))
+	(when scrobble-queue
+	  (scrobble-queue)))))
+    (kill-buffer buffer)))
 
 (provide 'scrobble)
 
