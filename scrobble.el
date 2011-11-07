@@ -117,7 +117,6 @@
   (goto-char (point-min))
   (let ((buffer (current-buffer)))
     (when (search-forward "\n\n" nil t)
-      (message "%s" (buffer-substring (point) (point-max)))
       (cond
        ((looking-at "BADAUTH")
 	(scrobble-login)
