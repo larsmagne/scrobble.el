@@ -93,8 +93,7 @@
 	(return nil))
       (when (string-match "OK" response)
 	(setq scrobble-queue
-	      (delete (assoc spec scrobble-queue)
-		      scrobble-queue))))))
+	      (delete spec scrobble-queue))))))
   
 (defun scrobble-try-send (spec)
   (unless scrobble-challenge
@@ -106,33 +105,29 @@
     response))
 
 (defun scrobble-send (spec)
-  (let ((coding-system-for-write 'binary))
-    (destructuring-bind (artist album song time track-length cddb-id) spec
-      (with-temp-file "/tmp/scrobble"
-	(insert
-	 (format "u=%s&s=%s&a[0]=%s&t[0]=%s&b[0]=%s&m[0]=%s&l[0]=%s&i[0]=%s"
-		 scrobble-user
-		 (md5 (concat (md5 scrobble-password)
-			      scrobble-challenge))
-		 (scrobble-encode artist)
-		 (scrobble-encode song)
-		 (scrobble-encode album)
-		 (or cddb-id "")
-		 (or track-length "")
-		 (scrobble-encode
-		  (format-time-string
-		   "%Y-%m-%d %H:%M:%S"
-		   (time-subtract time
-				  (list 0 (car (current-time-zone)))))))))))
-  (scrobble-ping))
-
-(defun scrobble-ping ()
-  (with-temp-buffer
-    (call-process "curl" nil (current-buffer) nil
-		  "-d" "@/tmp/scrobble" "-s"
-		  "-m" "1"
-		  scrobble-url)
-    (replace-regexp-in-string "\n" " " (buffer-string))))
+  (destructuring-bind (artist album song time track-length cddb-id) spec
+    (let ((coding-system-for-write 'binary)
+	  (url-request-data
+	   (format "u=%s&s=%s&a[0]=%s&t[0]=%s&b[0]=%s&m[0]=%s&l[0]=%s&i[0]=%s"
+		   scrobble-user
+		   (md5 (concat (md5 scrobble-password)
+				scrobble-challenge))
+		   (scrobble-encode artist)
+		   (scrobble-encode song)
+		   (scrobble-encode album)
+		   (or cddb-id "")
+		   (or track-length "")
+		   (scrobble-encode
+		    (format-time-string
+		     "%Y-%m-%d %H:%M:%S"
+		     (time-subtract time
+				    (list 0 (car (current-time-zone))))))))
+	  (url-request-extra-headers
+	   '(("Content-Type" . "application/x-www-form-urlencoded")))
+	  (url-request-method "POST"))
+      (with-current-buffer (url-retrieve-synchronously scrobble-url)
+	(message "%s" (buffer-string))
+	(replace-regexp-in-string "\n" " " (buffer-string))))))
 
 (provide 'scrobble)
 
