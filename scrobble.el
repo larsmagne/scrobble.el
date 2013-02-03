@@ -61,7 +61,6 @@
       (forward-line 1)
       (setq scrobble-challenge
 	    (buffer-substring (point) (point-at-eol)))
-      (message "Logged in to Last.fm")
       (forward-line 1)
       (setq scrobble-url
 	    (buffer-substring (point) (point-at-eol))))))
@@ -111,7 +110,8 @@
 	  (url-request-extra-headers
 	   '(("Content-Type" . "application/x-www-form-urlencoded")))
 	  (url-request-method "POST"))
-      (url-retrieve scrobble-url 'scrobble-check-and-run-queue (list spec)))))
+      (url-retrieve scrobble-url 'scrobble-check-and-run-queue (list spec)
+		    t))))
 
 (defun scrobble-check-and-run-queue (status spec)
   (goto-char (point-min))
