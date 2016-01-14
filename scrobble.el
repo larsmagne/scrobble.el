@@ -100,7 +100,9 @@
 		   (scrobble-encode artist)
 		   (scrobble-encode song)
 		   (scrobble-encode album)
-		   (or cddb-id "")
+		   ;; last.fm now ignores scrobbles that have the CDDB
+		   ;; ID set.
+		   "" ; (or cddb-id "")
 		   (or track-length "")
 		   (scrobble-encode
 		    (format-time-string
