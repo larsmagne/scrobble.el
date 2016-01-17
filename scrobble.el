@@ -28,7 +28,7 @@
 ;; often is.
 
 ;; Usage: Set `scrobble-user' and `scrobble-password', and then just call
-;; (scrobble artist album track).
+;; (scrobble artist album track duration).
 
 ;;; Code:
 
