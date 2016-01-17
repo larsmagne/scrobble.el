@@ -35,6 +35,11 @@
 (require 'cl)
 (require 'mm-url)
 
+(defvar scrobble-login-urls
+  '((:last "http://post.audioscrobbler.com/?hs=true&p=1.1&c=tst&v=10&u=%s")
+    (:libre "http://turtle.libre.fm/?hs=true&p=1.1&c=tst&v=10&u=%s"))
+  "An alist of URLs to send scrobbles to.")
+
 (defvar scrobble-user ""
   "last.fm user name.")
 
@@ -43,27 +48,33 @@
 
 ;; Internal variables.
 
-(defvar scrobble-challenge nil)
-(defvar scrobble-url nil)
+(defvar scrobble-states nil)
 (defvar scrobble-last nil)
-(defvar scrobble-queue nil)
 
-(defun scrobble-login ()
+(defun scrobble-login (service)
   (interactive)
   (with-temp-buffer
     (call-process
      "curl" nil (current-buffer) nil
-     "-s"
-     (format "http://post.audioscrobbler.com/?hs=true&p=1.1&c=tst&v=10&u=%s"
-	     scrobble-user))
+     "-s" (format (cadr (assq service scrobble-login-urls)) scrobble-user))
     (goto-char (point-min))
     (when (looking-at "UPTODATE")
       (forward-line 1)
-      (setq scrobble-challenge
-	    (buffer-substring (point) (point-at-eol)))
+      (scrobble-set service :challenge
+		    (buffer-substring (point) (point-at-eol)))
       (forward-line 1)
-      (setq scrobble-url
-	    (buffer-substring (point) (point-at-eol))))))
+      (scrobble-set service :url
+		    (buffer-substring (point) (point-at-eol))))))
+
+(defun scrobble-set (service key value)
+  (let ((state (assq service scrobble-states)))
+    (unless state
+      (setq state (list service))
+      (push state scrobble-states))
+    (setcdr state (plist-put (cdr state) key value))))
+
+(defun scrobble-get (service key)
+  (plist-get (cdr (assq service scrobble-states)) key))
 
 (defun scrobble-encode (string)
   (mm-url-form-encode-xwfu (encode-coding-string string 'utf-8)))
@@ -73,30 +84,38 @@
   (setq scrobble-last (list artist album song)))
 
 (defun scrobble (artist album song &optional track-length cddb-id)
-  (unless scrobble-challenge
-    (scrobble-login))
-  (let ((spec (list artist album song)))
+  (let* ((spec (list artist album song))
+	 (data (append spec (list (current-time) track-length cddb-id))))
     ;; If we're being called repeatedly with the same song, then
     ;; ignore subsequent calls.
     (when (not (equal spec scrobble-last))
       (setq scrobble-last spec)
       ;; Calls to last.fm may fail, so just put everything on the
       ;; queue, and flush the FIFO queue.
-      (push (append spec (list (current-time) track-length cddb-id))
-	    scrobble-queue)
+      (dolist (elem scrobble-login-urls)
+	(unless (scrobble-get (car elem) :challenge)
+	  (scrobble-login (car elem)))
+	(scrobble-set (car elem) :queue
+		      (cons data (scrobble-get (car elem) :queue))))
       (scrobble-queue))))
 
 (defun scrobble-queue ()
-  (scrobble-send (car scrobble-queue)))
+  (dolist (elem scrobble-login-urls)
+    (scrobble-queue-1 (car elem))))
 
-(defun scrobble-send (spec)
+(defun scrobble-queue-1 (service)
+  (let ((queue (scrobble-get service :queue)))
+    (when queue
+      (scrobble-send service (car queue)))))
+
+(defun scrobble-send (service spec)
   (destructuring-bind (artist album song time track-length cddb-id) spec
     (let ((coding-system-for-write 'binary)
 	  (url-request-data
 	   (format "u=%s&s=%s&a[0]=%s&t[0]=%s&b[0]=%s&m[0]=%s&l[0]=%s&i[0]=%s"
 		   scrobble-user
 		   (md5 (concat (md5 scrobble-password)
-				scrobble-challenge))
+				(scrobble-get service :challenge)))
 		   (scrobble-encode artist)
 		   (scrobble-encode song)
 		   (scrobble-encode album)
@@ -112,23 +131,24 @@
 	  (url-request-extra-headers
 	   '(("Content-Type" . "application/x-www-form-urlencoded")))
 	  (url-request-method "POST"))
-      (url-retrieve scrobble-url 'scrobble-check-and-run-queue (list spec)
+      (url-retrieve (scrobble-get service :url)
+		    'scrobble-check-and-run-queue (list service spec)
 		    t))))
 
-(defun scrobble-check-and-run-queue (status spec)
+(defun scrobble-check-and-run-queue (status service spec)
   (goto-char (point-min))
   (let ((buffer (current-buffer)))
     (when (search-forward "\n\n" nil t)
       (cond
        ((looking-at "BADAUTH")
-	(scrobble-login)
-	(when scrobble-queue
-	  (scrobble-queue)))
+	(scrobble-login service)
+	(when (scrobble-get service :queue)
+	  (scrobble-queue-1 service)))
        ((looking-at "OK")
-	(setq scrobble-queue
-	      (delete spec scrobble-queue))
-	(when scrobble-queue
-	  (scrobble-queue)))))
+	(scrobble-set service :queue
+		      (delete spec (scrobble-get service :queue)))
+	(when (scrobble-get service :queue)
+	  (scrobble-queue-1 service)))))
     (kill-buffer buffer)))
 
 (provide 'scrobble)
