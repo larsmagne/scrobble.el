@@ -138,9 +138,11 @@
 (defun scrobble-check-and-run-queue (status service spec)
   (goto-char (point-min))
   (let ((buffer (current-buffer)))
+    ;;(message "%s" (buffer-string))
     (when (search-forward "\n\n" nil t)
       (cond
-       ((looking-at "BADAUTH")
+       ((or (looking-at "BADAUTH")
+	    (looking-at "BADSESSION"))
 	(scrobble-login service)
 	(when (scrobble-get service :queue)
 	  (scrobble-queue-1 service)))
