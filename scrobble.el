@@ -83,9 +83,13 @@
   "Say that we don't want to scrobble the song right now."
   (setq scrobble-last (list artist album song)))
 
-(defun scrobble (artist album song &optional track-length cddb-id)
+(defun scrobble (artist album song &optional track-length cddb-id time)
   (let* ((spec (list artist album song))
-	 (data (append spec (list (current-time) track-length cddb-id))))
+	 (data (append spec (list (if time
+				      (list (/ (truncate time) (expt 2 16))
+					    (mod (truncate time) (expt 2 16)))
+				    (current-time))
+				  track-length cddb-id))))
     ;; If we're being called repeatedly with the same song, then
     ;; ignore subsequent calls.
     (when (not (equal spec scrobble-last))
@@ -138,7 +142,7 @@
 (defun scrobble-check-and-run-queue (status service spec)
   (goto-char (point-min))
   (let ((buffer (current-buffer)))
-    ;;(message "%s" (buffer-string))
+    (message "%s" (buffer-string))
     (when (search-forward "\n\n" nil t)
       (cond
        ((or (looking-at "BADAUTH")
@@ -152,6 +156,30 @@
 	(when (scrobble-get service :queue)
 	  (scrobble-queue-1 service)))))
     (kill-buffer buffer)))
+
+(defun scrobble-send-rockbox-log (file)
+  (interactive "fScrobble log file: ")
+  (let ((data nil))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (while (not (eobp))
+	(unless (looking-at "#")
+	  (push (split-string (buffer-substring (point) (line-end-position))
+			      "\t")
+		data))
+	(forward-line 1))
+      (setq data (nreverse data)))
+    (pop-to-buffer "*log*")
+    (erase-buffer)
+    (loop for (artist album track track-number duration rating time musicbrainz)
+	  in data
+	  do (setq time (string-to-number time))
+	  (when (< (string-to-number (format-time-string "%Y" time)) 1980)
+	    (setq time (+ time 1383000000)))
+	  (insert (format-time-string "%FT%T" time)
+		  " " artist " " album " " track "\n")
+	  (scrobble artist album track duration nil time)
+	  )))
 
 (provide 'scrobble)
 
