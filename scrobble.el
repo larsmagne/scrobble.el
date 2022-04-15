@@ -117,7 +117,7 @@
       (scrobble-send service (car queue)))))
 
 (defun scrobble-send (service spec)
-  (destructuring-bind (artist album song time track-length cddb-id) spec
+  (cl-destructuring-bind (artist album song time track-length cddb-id) spec
     (let ((coding-system-for-write 'binary)
 	  (url-request-data
 	   (format "u=%s&s=%s&a[0]=%s&t[0]=%s&b[0]=%s&m[0]=%s&l[0]=%s&i[0]=%s"
@@ -129,7 +129,7 @@
 		   (scrobble-encode album)
 		   ;; last.fm now ignores scrobbles that have the CDDB
 		   ;; ID set.
-		   "" ; (or cddb-id "")
+		   ""			; (or cddb-id "")
 		   (or track-length "")
 		   (scrobble-encode
 		    (format-time-string
@@ -175,15 +175,15 @@
       (setq data (nreverse data)))
     (pop-to-buffer "*log*")
     (erase-buffer)
-    (loop for (artist album track track-number duration rating time musicbrainz)
-	  in data
-	  do (setq time (string-to-number time))
-	  (when (< (string-to-number (format-time-string "%Y" time)) 1980)
-	    (setq time (+ time 1383000000)))
-	  (insert (format-time-string "%FT%T" time)
-		  " " artist " " album " " track "\n")
-	  (scrobble artist album track duration nil time)
-	  )))
+    (cl-loop for (artist album track track-number
+			 duration rating time musicbrainz)
+	     in data
+	     do (setq time (string-to-number time))
+	     (when (< (string-to-number (format-time-string "%Y" time)) 1980)
+	       (setq time (+ time 1383000000)))
+	     (insert (format-time-string "%FT%T" time)
+		     " " artist " " album " " track "\n")
+	     (scrobble artist album track duration nil time))))
 
 (provide 'scrobble)
 
