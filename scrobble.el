@@ -37,7 +37,8 @@
 
 (defvar scrobble-login-urls
   '((:last "http://post.audioscrobbler.com/?hs=true&p=1.1&c=tst&v=10&u=%s")
-    (:libre "http://turtle.libre.fm/?hs=true&p=1.1&c=tst&v=10&u=%s"))
+    ;;(:libre "http://turtle.libre.fm/?hs=true&p=1.1&c=tst&v=10&u=%s")
+    )
   "An alist of URLs to send scrobbles to.")
 
 (defvar scrobble-user ""
@@ -97,11 +98,14 @@
       ;; Calls to last.fm may fail, so just put everything on the
       ;; queue, and flush the FIFO queue.
       (dolist (elem scrobble-login-urls)
-	(unless (scrobble-get (car elem) :challenge)
-	  (scrobble-login (car elem)))
+	(when t
+	  (unless (scrobble-get (car elem) :challenge)
+	    (message "Logging in on %s" (car elem))
+	    (scrobble-login (car elem))))
 	(scrobble-set (car elem) :queue
 		      (cons data (scrobble-get (car elem) :queue))))
-      (scrobble-queue))))
+      (scrobble-queue)
+      )))
 
 (defun scrobble-queue ()
   (dolist (elem scrobble-login-urls)
@@ -142,7 +146,7 @@
 (defun scrobble-check-and-run-queue (status service spec)
   (goto-char (point-min))
   (let ((buffer (current-buffer)))
-    (message "%s" (buffer-string))
+    ;;(message "%s" (buffer-string))
     (when (search-forward "\n\n" nil t)
       (cond
        ((or (looking-at "BADAUTH")
