@@ -32,7 +32,6 @@
 
 ;;; Code:
 
-(require 'cl)
 (require 'mm-url)
 
 (defvar scrobble-login-urls
@@ -62,10 +61,10 @@
     (when (looking-at "UPTODATE")
       (forward-line 1)
       (scrobble-set service :challenge
-		    (buffer-substring (point) (point-at-eol)))
+		    (buffer-substring (point) (line-end-position)))
       (forward-line 1)
       (scrobble-set service :url
-		    (buffer-substring (point) (point-at-eol))))))
+		    (buffer-substring (point) (line-end-position))))))
 
 (defun scrobble-set (service key value)
   (let ((state (assq service scrobble-states)))
