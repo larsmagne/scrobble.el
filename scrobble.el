@@ -36,7 +36,7 @@
 
 (defvar scrobble-login-urls
   '((:last "http://post.audioscrobbler.com/?hs=true&p=1.1&c=tst&v=10&u=%s")
-    ;;(:libre "http://turtle.libre.fm/?hs=true&p=1.1&c=tst&v=10&u=%s")
+    (:libre "http://turtle.libre.fm/?hs=true&p=1.1&c=tst&v=10&u=%s")
     )
   "An alist of URLs to send scrobbles to.")
 
@@ -46,10 +46,17 @@
 (defvar scrobble-password ""
   "Password to use.")
 
+(defvar scrobble-passwords nil
+  "Passwords to use.")
+
 ;; Internal variables.
 
 (defvar scrobble-states nil)
 (defvar scrobble-last nil)
+
+(defun scrobble-password (service)
+  (or (cadr (assq service scrobble-passwords))
+      scrobble-password))
 
 (defun scrobble-login (service)
   (interactive)
@@ -121,7 +128,7 @@
 	  (url-request-data
 	   (format "u=%s&s=%s&a[0]=%s&t[0]=%s&b[0]=%s&m[0]=%s&l[0]=%s&i[0]=%s"
 		   scrobble-user
-		   (md5 (concat (md5 scrobble-password)
+		   (md5 (concat (md5 (scrobble-password service))
 				(scrobble-get service :challenge)))
 		   (scrobble-encode artist)
 		   (scrobble-encode song)
